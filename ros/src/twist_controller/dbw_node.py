@@ -81,7 +81,7 @@ class DBWNode(object):
                                                     wheel_radius,
                                                     yaw_controller)
         self.low_pass_filter_steer = LowPassFilter(TAU, TS)
-        self.low_pass_filter_throttle = LowPassFilter(TAU, TS)
+#        self.low_pass_filter_throttle = LowPassFilter(TAU, TS)
 
         # TODO: Subscribe to all the topics you need to
         rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
@@ -119,7 +119,7 @@ class DBWNode(object):
                                                                       self.vel.twist.linear,
                                                                       self.dbw_status,
                                                                       0.02)
-                throttle = self.low_pass_filter_throttle.filt(throttle)
+#                throttle = self.low_pass_filter_throttle.filt(throttle)
                 steering = self.low_pass_filter_steer.filt(steering)
                 #brake = brake  / self.max_brake_trq
                 self.publish(throttle, brake, steering)
