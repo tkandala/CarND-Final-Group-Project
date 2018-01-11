@@ -42,11 +42,43 @@ class WaypointUpdater(object):
 
     def pose_cb(self, msg):
         # TODO: Implement
-        pass
+        rospy.loginfo('pose_cb - x:%s y:%s z:%s', msg.pose.position.x, msg.pose.position.y, msg.pose.position.z)
+
+        index = 0
+        shortest_index = 0
+        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
+        shortest_distance = dl(msg.pose.position, self.waypoints.waypoints[index].pose.pose.position)
+        for wp in self.waypoints.waypoints:
+            distance = dl(msg.pose.position, wp.pose.pose.position)
+            if distance < shortest_distance and msg.pose.position < wp.pose.pose.position:
+                shortest_distance = distance
+                shortest_index = index
+            index = index+1
+        rospy.loginfo('shortest_distance = %s index = %s', distance, shortest_index)
+        waypoints = []
+        array_len = len(self.waypoints.waypoints)
+        for i in range(LOOKAHEAD_WPS):
+            if (shortest_index + i) < array_len:
+                wp_add = self.waypoints.waypoints[i+shortest_index]
+            else:
+                wp_add = self.waypoints.waypoints[shortest_index+i-array_len]
+            waypoints.append(wp_add)
+            #rospy.loginfo('pose_cb - linear.x:%s linear.y:%s linear.z:%s array_len:%s',wp_add.twist.twist.linear.x, wp_add.twist.twist.linear.y, wp_add.twist.twist.linear.z, array_len)
+        self.publish(waypoints)
+
+    def publish(self, waypoints):
+        lane = Lane()
+        lane.header.frame_id = '/world'
+        lane.header.stamp = rospy.Time(0)
+        lane.waypoints = waypoints
+        self.final_waypoints_pub.publish(lane)
 
     def waypoints_cb(self, waypoints):
+#        for i in range(5):
+#            position = waypoints.waypoints[i].pose.pose.position
+#            rospy.loginfo('waypoints_cb - x:%s y:%s z:%s', position.x, position.y, position.z)
         # TODO: Implement
-        pass
+        self.waypoints = waypoints
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
