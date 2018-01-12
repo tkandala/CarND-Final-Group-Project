@@ -35,6 +35,9 @@ class TLDetector(object):
         sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
         sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)
 
+        # The permanent (x, y) coordinates for each traffic light's stop line are
+        # provided by the config dictionary,
+        # which is imported from the traffic_light_config file:
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
 
@@ -90,7 +93,7 @@ class TLDetector(object):
             self.upcoming_red_light_pub.publish(Int32(self.last_wp))
         self.state_count += 1
 
-    def get_closest_waypoint(self, pose):
+    def get_closest_waypoint(self, pos_x, pos_y):
         """Identifies the closest path waypoint to the given position
             https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
         Args:
@@ -101,7 +104,27 @@ class TLDetector(object):
 
         """
         #TODO implement
-        return 0
+
+        closest_WP = -1
+        # Return index if the waypoint list is empty
+        if self.waypoints is None:
+            return closest_WP
+
+        # Create array of the positions
+        position = np.asarray([pos_x, pos_y])
+
+        # Create list of the distances between waypoint and position
+        dist_squared = np.sum((self.waypoints_array - position)**2, axis=1)
+
+        # Assign smalles ardument of the list to index and return
+        closest_WP = np.argmin(dist_squared)
+
+        # Print info for debug
+        #
+
+        return closest_WP
+
+        #return 0
 
     def get_light_state(self, light):
         """Determines the current color of the traffic light
@@ -126,6 +149,10 @@ class TLDetector(object):
         """Finds closest visible traffic light, if one exists, and determines its
             location and color
 
+        # use the get_closest_waypoint method to find the closest waypoints to the vehicle and lights.
+        # Using these waypoint indices, you can determine which light is ahead of the vehicle along
+        # the list of waypoints.
+
         Returns:
             int: index of waypoint closes to the upcoming stop line for a traffic light (-1 if none exists)
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
@@ -145,6 +172,8 @@ class TLDetector(object):
             return light_wp, state
         self.waypoints = None
         return -1, TrafficLight.UNKNOWN
+
+#############################################################################################################
 
 if __name__ == '__main__':
     try:
