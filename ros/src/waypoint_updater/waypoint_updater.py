@@ -26,13 +26,14 @@ LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this n
 
 class WaypointUpdater(object):
     def __init__(self):
+        self.waypoints = None
+
         rospy.init_node('waypoint_updater')
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
-
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
@@ -41,29 +42,26 @@ class WaypointUpdater(object):
         rospy.spin()
 
     def pose_cb(self, msg):
-        # TODO: Implement
-        rospy.loginfo('pose_cb - x:%s y:%s z:%s', msg.pose.position.x, msg.pose.position.y, msg.pose.position.z)
+        if self.waypoints is None:
+            return
 
-        index = 0
-        shortest_index = 0
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
-        shortest_distance = dl(msg.pose.position, self.waypoints.waypoints[index].pose.pose.position)
-        for wp in self.waypoints.waypoints:
-            distance = dl(msg.pose.position, wp.pose.pose.position)
-            if distance < shortest_distance and msg.pose.position < wp.pose.pose.position:
-                shortest_distance = distance
-                shortest_index = index
-            index = index+1
-        rospy.loginfo('shortest_distance = %s index = %s', distance, shortest_index)
-        waypoints = []
-        array_len = len(self.waypoints.waypoints)
-        for i in range(LOOKAHEAD_WPS):
-            if (shortest_index + i) < array_len:
-                wp_add = self.waypoints.waypoints[i+shortest_index]
-            else:
-                wp_add = self.waypoints.waypoints[shortest_index+i-array_len]
-            waypoints.append(wp_add)
-            #rospy.loginfo('pose_cb - linear.x:%s linear.y:%s linear.z:%s array_len:%s',wp_add.twist.twist.linear.x, wp_add.twist.twist.linear.y, wp_add.twist.twist.linear.z, array_len)
+        distances = [ dl(msg.pose.position, waypoint.pose.pose.position) for waypoint in self.waypoints ]
+        increasing = distances[1] > distances[0]
+        start_idx = None
+        if increasing:
+            start_idx = 0
+        else:
+            min_distance = 1e9
+            min_idx = -1
+            for (idx, distance) in enumerate(distances):
+                if distance < min_distance:
+                    min_distance = distance
+                    min_idx = idx 
+                elif idx > 0 and idx - 1 == min_idx and distance > min_distance:
+                    start_idx = idx
+                    break
+        waypoints = self.waypoints[start_idx:start_idx+LOOKAHEAD_WPS]
         self.publish(waypoints)
 
     def publish(self, waypoints):
@@ -72,13 +70,9 @@ class WaypointUpdater(object):
         lane.header.stamp = rospy.Time(0)
         lane.waypoints = waypoints
         self.final_waypoints_pub.publish(lane)
-
+        
     def waypoints_cb(self, waypoints):
-#        for i in range(5):
-#            position = waypoints.waypoints[i].pose.pose.position
-#            rospy.loginfo('waypoints_cb - x:%s y:%s z:%s', position.x, position.y, position.z)
-        # TODO: Implement
-        self.waypoints = waypoints
+        self.waypoints = waypoints.waypoints
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement

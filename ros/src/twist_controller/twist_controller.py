@@ -6,9 +6,9 @@ GAS_DENSITY = 2.858
 ONE_MPH = 0.44704
 MAX_THROTTLE = 1.0
 
-KP_VEL = 0.4
+KP_VEL = 0.8
 KI_VEL = 0.0
-KD_VEL = 0.0
+KD_VEL = 0.05
 
 #brake = (vehicle_mass + fuel_capacity * GAS_DENSITY) * acceleration * wheel_radius
 #Now taking the parameter values for the simulator (dbw_sim.launch), I get, with the max acceleration allowed:
@@ -36,7 +36,7 @@ class Controller(object):
         error_linear_v = target_linear_v.x - current_linear_v.x
         value = self.pid_vel.step(error_linear_v, sample_time)
 
-        rospy.loginfo('error_linear_v:%s value:%s', error_linear_v, value)
+        rospy.loginfo('error_linear_v:%s current_linear_v.x:%s value:%s', error_linear_v, current_linear_v.x, value)
         # Return throttle, brake, steer
         brake = 0.0
         throttle = 0.0

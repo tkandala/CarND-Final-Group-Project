@@ -65,6 +65,7 @@ class DBWNode(object):
         self.vel = None
         self.twist = None
         self.dbw_status = True
+        self.previous_time =  rospy.get_rostime()
 
         # TODO: Create `TwistController` object
         yaw_controller = YawController(wheel_base,
@@ -113,12 +114,17 @@ class DBWNode(object):
         while not rospy.is_shutdown():
             # TODO: Get predicted throttle, brake, and steering using `twist_controller`
             # You should only publish the control commands if dbw is enabled
-            if self.twist != None and self.vel!=None:
+            if self.twist != None and self.vel!=None and self.dbw_status == True:
+                rospy.loginfo('controller.control called')
+                current_time = rospy.get_rostime()
+                duration = current_time - self.previous_time
+                duration_in_seconds = duration.secs + (1e-9 * duration.nsecs)
+                self.previous_time = current_time
                 throttle, brake, steering = self.controller.control(self.twist.twist.linear,
                                                                       self.twist.twist.angular,
                                                                       self.vel.twist.linear,
                                                                       self.dbw_status,
-                                                                      0.02)
+                                                                      duration_in_seconds)
 #                throttle = self.low_pass_filter_throttle.filt(throttle)
                 steering = self.low_pass_filter_steer.filt(steering)
                 #brake = brake  / self.max_brake_trq
