@@ -29,7 +29,7 @@ class Controller(object):
 
     def control(self, target_linear_v, target_angular_v, current_linear_v, dbw_status, sample_time):
         # TODO: Change the arg, kwarg list to suit your needs
-        if dbw_status == False:
+        if dbw_status.data == False:
             self.pid_vel.reset()
             return 0., 0., 0.
 
