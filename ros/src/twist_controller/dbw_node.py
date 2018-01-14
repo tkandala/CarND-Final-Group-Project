@@ -37,6 +37,9 @@ TAU = 0.2
 TS = 0.1
 GAS_DENSITY = 2.858
 
+#Set it True if simulator and VM are used.
+IsSimulator = True
+
 class DBWNode(object):
 
     def __init__(self):
@@ -82,7 +85,7 @@ class DBWNode(object):
                                                     wheel_radius,
                                                     yaw_controller)
         self.low_pass_filter_steer = LowPassFilter(TAU, TS)
-#        self.low_pass_filter_throttle = LowPassFilter(TAU, TS)
+        self.low_pass_filter_throttle = LowPassFilter(TAU, TS)
 
         # TODO: Subscribe to all the topics you need to
         rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
@@ -92,40 +95,47 @@ class DBWNode(object):
 
     def current_velocity_cb(self, vel):
         self.vel = vel
-        rospy.loginfo('current_velocity_cb - Linear     x:%s y:%s z:%s', vel.twist.linear.x, vel.twist.linear.y, vel.twist.linear.z)
-        rospy.loginfo('current_velocity_cb - Anguler   x:%s y:%s z:%s', vel.twist.angular.x, vel.twist.angular.y, vel.twist.angular.z)
+        #rospy.loginfo('current_velocity_cb - Linear     x:%s y:%s z:%s',
+        #                                                vel.twist.linear.x, vel.twist.linear.y, vel.twist.linear.z)
+        #rospy.loginfo('current_velocity_cb - Anguler   x:%s y:%s z:%s',
+        #                                                vel.twist.angular.x, vel.twist.angular.y, vel.twist.angular.z)
 
     def twist_cmd_cb(self, twist):
         self.twist = twist
-        rospy.loginfo('twist_cmd_cb - Linear     x:%s y:%s z:%s', twist.twist.linear.x, twist.twist.linear.y, twist.twist.linear.z)
-        rospy.loginfo('twist_cmd_cb - Anguler   x:%s y:%s z:%s', twist.twist.angular.x, twist.twist.angular.y, twist.twist.angular.z)
-#        self.twist.twist.linear.x = 0.
+        #rospy.loginfo('twist_cmd_cb - Linear     x:%s y:%s z:%s',
+        #                                                twist.twist.linear.x, twist.twist.linear.y, twist.twist.linear.z)
+        #rospy.loginfo('twist_cmd_cb - Anguler   x:%s y:%s z:%s',
+        #                                                twist.twist.angular.x, twist.twist.angular.y, twist.twist.angular.z)
 
     def dbw_enabled_cb(self, dbw):
         self.dbw_status = dbw
         rospy.loginfo('dbw_enabled_cb dbw_status:%s', dbw.data)
 
     def loop(self):
-        rate = rospy.Rate(20) # 50Hz
+        if IsSimulator:
+            frequency = 10
+        else:
+            frequency = 50
+        rate = rospy.Rate(frequency) # 50Hz
         throttle = 0.0
         brake = 0.0
         steering = 0.0
         while not rospy.is_shutdown():
             # TODO: Get predicted throttle, brake, and steering using `twist_controller`
             # You should only publish the control commands if dbw is enabled
-            if self.twist != None and self.vel != None and self.dbw_status !=None and self.dbw_status.data == True:
+            if self.twist != None and self.vel != None and self.dbw_status != None:
                 rospy.loginfo('controller.control called')
                 current_time = rospy.get_rostime()
                 duration = current_time - self.previous_time
                 duration_in_seconds = duration.secs + (1e-9 * duration.nsecs)
                 self.previous_time = current_time
-                throttle, brake, steering = self.controller.control(self.twist.twist.linear,
-                                                                      self.twist.twist.angular,
-                                                                      self.vel.twist.linear,
-                                                                      self.dbw_status,
+                yaw_angle = self.low_pass_filter_steer.filt(self.twist.twist.angular.z)
+                throttle, brake, steering = self.controller.control(self.twist.twist.linear.x,
+                                                                      yaw_angle,
+                                                                      self.vel.twist.linear.x,
+                                                                      self.dbw_status.data,
                                                                       duration_in_seconds)
-#                throttle = self.low_pass_filter_throttle.filt(throttle)
-                steering = self.low_pass_filter_steer.filt(steering)
+                throttle = self.low_pass_filter_throttle.filt(throttle)
                 self.publish(throttle, brake, steering)
             rate.sleep()
 
