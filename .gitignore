@@ -3,6 +3,7 @@
 build
 devel
 
+.vscode
 profile.tmp
 data/dbw_test.rosbag.bag
 ros/src/twist_controller/brakes.csv
