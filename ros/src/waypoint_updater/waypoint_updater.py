@@ -73,32 +73,6 @@ class WaypointUpdater(object):
         lane.header.stamp = rospy.Time(0)
         lane.waypoints = waypoints
         self.final_waypoints_pub.publish(lane)
-
-        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
-        distances = [ dl(msg.pose.position, waypoint.pose.pose.position) for waypoint in self.waypoints ]
-        increasing = distances[1] > distances[0]
-        start_idx = None
-        if increasing:
-            start_idx = 0
-        else:
-            min_distance = 1e9
-            min_idx = -1
-            for (idx, distance) in enumerate(distances):
-                if distance < min_distance:
-                    min_distance = distance
-                    min_idx = idx 
-                elif idx > 0 and idx - 1 == min_idx and distance > min_distance:
-                    start_idx = idx
-                    break
-        waypoints = self.waypoints[start_idx:start_idx+LOOKAHEAD_WPS]
-        self.publish(waypoints)
-
-    def publish(self, waypoints):
-        lane = Lane()
-        lane.header.frame_id = '/world'
-        lane.header.stamp = rospy.Time(0)
-        lane.waypoints = waypoints
-        self.final_waypoints_pub.publish(lane)
         
     def waypoints_cb(self, waypoints):
         self.waypoints = waypoints.waypoints
