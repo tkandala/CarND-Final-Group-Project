@@ -33,20 +33,25 @@ class WaypointUpdater(object):
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
 
-
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
         # TODO: Add other member variables you need below
+        self.waypoints_loaded = False
+        self.waypoints_loaded_msg = False
+        self.waypts = None
 
         rospy.spin()
 
     def pose_cb(self, msg):
         # TODO: Implement
-        pass
+
+        #rospy.loginfo("x: %s", msg.pose.position.x)
+        self.publish(msg.pose.position)
 
     def waypoints_cb(self, waypoints):
         # TODO: Implement
-        pass
+        self.waypts = waypoints.waypoints
+        self.waypoints_loaded = True
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
@@ -69,6 +74,28 @@ class WaypointUpdater(object):
             dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
             wp1 = i
         return dist
+
+    def publish(self, position):
+        if self.waypoints_loaded:
+            # Find the next LOOKAHEAD_WPS waypoints
+            #rospy.loginfo(position)
+            counter = 0
+            self.final_waypoints = []
+            for a in range(len(self.waypts)):
+                if self.waypts[a].pose.pose.position.x > position.x and counter < LOOKAHEAD_WPS:
+                    counter += 1
+                    #rospy.loginfo("waypoint index: %s", a)
+                    self.final_waypoints.append(self.waypts[a])
+            lane = Lane()
+            if len(self.final_waypoints) == LOOKAHEAD_WPS:
+                lane.header.frame_id = '/world'
+                lane.header.stamp = rospy.Time(0)
+                lane.waypoints = self.final_waypoints
+            self.final_waypoints_pub.publish(lane)
+        else:
+            rospy.logerr("Waypoints not loaded")
+
+        pass
 
 
 if __name__ == '__main__':
