@@ -3,4 +3,5 @@
 build
 devel
 
+.vscode
 profile.tmp
