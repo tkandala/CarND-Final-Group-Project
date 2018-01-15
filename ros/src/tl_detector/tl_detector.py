@@ -164,7 +164,6 @@ class TLDetector(object):
 
             for stop_line_index in self.stop_line_indexes:
                 if stop_line_index > car_index and stop_line_index - car_index < 150:
-                    rospy.loginfo("Stop light %d waypoints ahead", stop_line_index - car_index)
                     light_wp = stop_line_index
                     light = True
                     break
@@ -172,7 +171,6 @@ class TLDetector(object):
         if light:
             state = self.get_light_state(light)
             return light_wp, state
-        # self.waypoints = None
         return -1, TrafficLight.UNKNOWN
 
 if __name__ == '__main__':
