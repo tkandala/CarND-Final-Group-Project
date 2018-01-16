@@ -3,6 +3,7 @@
 import rospy
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
+from std_msgs.msg import Int32
 
 import math
 
@@ -29,7 +30,10 @@ LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this n
 
 class WaypointUpdater(object):
     def __init__(self):
+
         self.waypoints = None
+        self.current_pose = None
+        self.current_pose_idx = None
 
         rospy.init_node('waypoint_updater')
 
@@ -37,6 +41,8 @@ class WaypointUpdater(object):
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb, queue_size=1)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
+
+        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb, queue_size=1)        
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
@@ -47,7 +53,10 @@ class WaypointUpdater(object):
     def pose_cb(self, msg):
         if self.waypoints is None:
             return
-          
+        
+        #rospy.loginfo("current pose: %s", msg)
+        self.current_pose = msg.pose
+
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
         distances = [ dl(msg.pose.position, waypoint.pose.pose.position) for waypoint in self.waypoints ]
         increasing = distances[1] > distances[0]
@@ -64,6 +73,7 @@ class WaypointUpdater(object):
                 elif idx > 0 and idx - 1 == min_idx and distance > min_distance:
                     start_idx = idx
                     break
+        self.current_pose_idx = start_idx - 1
         waypoints = self.waypoints[start_idx:start_idx+LOOKAHEAD_WPS]
         self.publish(waypoints)
 
@@ -79,7 +89,32 @@ class WaypointUpdater(object):
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
-        pass
+
+        #rospy.loginfo("Traffic light detected: %s", msg)
+
+        next_traffic_light_idx = msg.data
+
+        if next_traffic_light_idx != -1:
+            # get current position index and calculate the distance to the red light for slowing down
+
+            # distance to traffic light
+            dist_to_light = self.distance(self.waypoints, self.current_pose_idx, next_traffic_light_idx)
+            safe_distance = 10 #stop at a safe distance from the light say 10 waypoints from the light
+            idx_to_stop = next_traffic_light_idx - safe_distance
+
+            # may be a good thing will be to see if we have enough distance to stop before hitting high deceleration or jerk
+            # but for now we will stop right before we reach the intersection and calculate deceleration based on that
+            if self.current_pose_idx <= (next_traffic_light_idx - idx_to_stop):
+                dist_to_stop = self.distance(self.waypoints, self.current_pose_idx, idx_to_stop)
+                current_vel = self.get_waypoint_velocity(self.waypoints[self.current_pose_idx])
+                req_dcln = -(current_vel * current_vel)/dist_to_stop
+
+                #calulate the velocity of the next waypoint based on deceleration until we reach the intersection
+                for idx in range(idx_to_stop - self.current_pose_idx):
+                    start_idx = idx
+                    dist_to_next_waypoint = self.distance(self.waypoints, start_idx, start_idx + 1)
+                    next_waypoint_vel = (req_dcln * dist_to_next_waypoint / current_vel) + current_vel
+                    self.set_waypoint_velocity(self.waypoints, start_idx + 1, next_waypoint_vel)
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
