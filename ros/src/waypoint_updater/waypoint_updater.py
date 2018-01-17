@@ -9,33 +9,32 @@ import math
 
 '''
 This node will publish waypoints from the car's current position to some `x` distance ahead.
-
 As mentioned in the doc, you should ideally first implement a version which does not care
 about traffic lights or obstacles.
-
 Once you have created dbw_node, you will update this node to use the status of traffic lights too.
-
 Please note that our simulator also provides the exact location of traffic lights and their
 current status in `/vehicle/traffic_lights` message. You can use this message to build this node
 as well as to verify your TL classifier.
-
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
-
 IMPORTANT: queue_size=1 in rospy.Subscribe() is very imporant to test it with the simulator
 and VM. See more detail here.
 https://discussions.udacity.com/t/solved-stuck-at-steer-value-yawcontroller/499558/3
 '''
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
+ACCEL = 1.0 # increment of 1 m/s at each waypoint
+MAX_SPEED = 27.0 # m/s <=> 100km/h
 
 class WaypointUpdater(object):
     def __init__(self):
+
+	rospy.init_node('waypoint_updater')
 
         self.waypoints = None
         self.current_pose = None
         self.current_pose_idx = None
 
-        rospy.init_node('waypoint_updater')
+        
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb, queue_size=1)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb, queue_size=1)
@@ -115,6 +114,18 @@ class WaypointUpdater(object):
                     dist_to_next_waypoint = self.distance(self.waypoints, start_idx, start_idx + 1)
                     next_waypoint_vel = (req_dcln * dist_to_next_waypoint / current_vel) + current_vel
                     self.set_waypoint_velocity(self.waypoints, start_idx + 1, next_waypoint_vel)
+
+            else:
+                current_vel = self.get_waypoint_velocity(self.waypoints[self.current_pose_idx])
+
+                # Calulate the velocity of the next waypoint based on incremental speed
+                # until we reach the max speed
+                for wp in self.final_waypoints:
+                    if current_vel > MAX_SPEED:                
+                        current_vel = current_vel - ACCEL # min(MAX_SPEED, current_vel+ACCEL)
+                    else:
+                        current_vel = current_vel + ACCEL # max(MAX_SPEED, current_vel-ACCEL)
+                    self.set_waypoint_velocity(self.waypoints, wp, current_vel) #Accelelerate to max speed
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
