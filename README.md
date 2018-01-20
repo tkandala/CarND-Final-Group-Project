@@ -12,6 +12,15 @@ This is the project repo for the final project of the Udacity Self-Driving Car N
 
 Please use **one** of the two installation options, either native **or** docker installation.
 
+This repository contains a few files stored using [Git Large File
+Storage](<https://git-lfs.github.com>). The files are large, trained weights and
+biases for neural networks to perform inference for traffic light detection. To
+download the entire repository, ensure [\`git
+lfs\`](<https://git-lfs.github.com>) is installed and then to clone the
+repository, run: \`git lfs clone
+<https://github.com/tkandala/CarND-Final-Group-Project>\`.
+
+
 ### Native Installation
 
 * Be sure that your workstation is running Ubuntu 16.04 Xenial Xerus or Ubuntu 14.04 Trusty Tahir. [Ubuntu downloads can be found here](https://www.ubuntu.com/download/desktop).
