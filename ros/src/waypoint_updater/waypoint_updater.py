@@ -21,8 +21,8 @@ and VM. See more detail here.
 https://discussions.udacity.com/t/solved-stuck-at-steer-value-yawcontroller/499558/3
 '''
 
-LOOKAHEAD_WPS = 100 # Number of waypoints we will publish. You can change this number
-ACCEL = 0.1 # increment of 1 m/s at each waypoint
+LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
+ACCEL = 0.5 # increment of 1 m/s at each waypoint
 MAX_SPEED = 11.0 # m/s <=> 100km/h
 
 class WaypointUpdater(object):
@@ -34,7 +34,8 @@ class WaypointUpdater(object):
         self.current_pose = None
         self.current_pose_idx = None
         self.next_red_traffic_light_idx = -1
-        
+        self.is_stopped = False
+        self.is_cold_start = True
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb, queue_size=1)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb, queue_size=1)
@@ -87,48 +88,48 @@ class WaypointUpdater(object):
         if self.waypoints_loaded:
             # Find the next LOOKAHEAD_WPS waypoints
             #rospy.loginfo(position)
-            counter = 0
-            self.final_waypoints = []
             for a in range(len(self.waypoints)):
-                if self.waypoints[a].pose.pose.position.x > position.x and counter < LOOKAHEAD_WPS:
-                    if counter == 0:
-                        self.current_pose_idx = a - 1
-                        start_wp_idx = a - 1
-                        #rospy.loginfo("current position idx: %s", self.current_pose_idx)
-                    counter += 1
+                if self.waypoints[a].pose.pose.position.x > position.x:
+                    self.current_pose_idx = a - 1
+                    #rospy.loginfo("current_pose_idx: %s and current_vel = %s", a-1, self.waypoints[a-1].twist.twist.linear.x)
+                    break
+                    #rospy.loginfo("current position idx: %s", self.current_pose_idx)
                     #rospy.loginfo("waypoint index: %s", a)
-                    self.final_waypoints.append(self.waypoints[a])
+                    #self.final_waypoints.append(self.waypoints[a])
             lane = Lane()
-            if len(self.final_waypoints) == LOOKAHEAD_WPS:
+            
+            # Check if Traffic light was detected and plan waypoint accordingly
+            if self.next_red_traffic_light_idx != -1 and not self.is_stopped:
+                rospy.loginfo("TL detected: %s and current position: %s", self.next_red_traffic_light_idx, position.x)
+                #dist_to_light = self.distance(self.waypoints, self.current_pose_idx, self.next_red_traffic_light_idx)
+                safe_distance = 10 #stop at a safe distance from the light say 10 waypoints from the light
+                idx_to_stop = self.next_red_traffic_light_idx - safe_distance
 
-                # Check if Traffic light was detected and plan waypoint accordingly
-
-                if self.next_red_traffic_light_idx != -1:
-                    #rospy.loginfo("TL detected: %s and current position: %s", self.next_red_traffic_light_idx, position.x)
-                    dist_to_light = self.distance(self.waypoints, self.current_pose_idx, self.next_red_traffic_light_idx)
-                    safe_distance = 10 #stop at a safe distance from the light say 10 waypoints from the light
-                    idx_to_stop = self.next_red_traffic_light_idx - safe_distance
-
-                    # may be a good thing will be to see if we have enough distance to stop before hitting high deceleration or jerk
-                    # but for now we will stop right before we reach the intersection and calculate deceleration based on that
-                    if self.current_pose_idx <= idx_to_stop:
-                        #calulate the velocity of the next waypoint based on deceleration until we reach the intersection
-                        for idx in range(LOOKAHEAD_WPS):
-                            next_waypoint_vel = self.final_waypoints[idx].twist.twist.linear.x - (idx + 1)*ACCEL
-                            if next_waypoint_vel < 0:
-                                next_waypoint_vel = -1
-                            self.set_waypoint_velocity(self.final_waypoints, idx, next_waypoint_vel)
-                elif self.final_waypoints[0].twist.twist.linear.x < MAX_SPEED:
-                    #rospy.loginfo("TL green and current position: %s", position.x)
+                # may be a good thing will be to see if we have enough distance to stop before hitting high deceleration or jerk
+                # but for now we will stop right before we reach the intersection and calculate deceleration based on that
+                if self.current_pose_idx <= idx_to_stop:
+                    rospy.loginfo("is within safe distance to stop")
+                    self.is_stopped = True
+                    #calulate the velocity of the next waypoint based on deceleration until we reach the intersection
                     for idx in range(LOOKAHEAD_WPS):
-                        next_waypoint_vel = self.final_waypoints[idx].twist.twist.linear.x + (idx + 1)*ACCEL
-                        if next_waypoint_vel > MAX_SPEED:
-                            next_waypoint_vel = MAX_SPEED
-                        self.set_waypoint_velocity(self.final_waypoints, idx, next_waypoint_vel)
+                        next_waypoint_vel = self.waypoints[idx + self.current_pose_idx].twist.twist.linear.x - (idx + 1)*ACCEL
+                        if next_waypoint_vel < 0 or self.is_cold_start:
+                            next_waypoint_vel = -1
+                        self.set_waypoint_velocity(self.waypoints, idx + self.current_pose_idx, next_waypoint_vel)
+            elif self.next_red_traffic_light_idx == -1 and self.is_stopped:
+                self.is_stopped = False
+                self.is_cold_start = False
+                rospy.loginfo("TL green and current position: %s", self.current_pose_idx)
+                for idx in range(LOOKAHEAD_WPS):
+                    next_waypoint_vel = 1.1 + self.waypoints[idx+self.current_pose_idx].twist.twist.linear.x + (idx + 1)*ACCEL
+                    if next_waypoint_vel > MAX_SPEED:
+                        next_waypoint_vel = MAX_SPEED
+                    self.set_waypoint_velocity(self.waypoints, idx + self.current_pose_idx, 11)
+                    #rospy.loginfo("setting vel for idx= %s to %s", self.current_pose_idx + idx, self.waypoints[self.current_pose_idx+idx].twist.twist.linear.x)
 
-                lane.header.frame_id = '/world'
-                lane.header.stamp = rospy.Time(0)
-                lane.waypoints = self.final_waypoints
+            lane.header.frame_id = '/world'
+            lane.header.stamp = rospy.Time(0)
+            lane.waypoints = self.waypoints[self.current_pose_idx:self.current_pose_idx+LOOKAHEAD_WPS]
             self.final_waypoints_pub.publish(lane)
         else:
             rospy.logerr("Waypoints not loaded")
