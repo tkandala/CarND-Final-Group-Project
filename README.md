@@ -18,7 +18,7 @@ download the entire repository, ensure Git LFS is installed and then to clone th
 repository, run:
 
 ```bash
-git lfs clone https://github.com/tkandala/CarND-Final-Group-Project>
+git lfs clone https://github.com/tkandala/CarND-Final-Group-Project
 ```
 
 ### Native Installation
