@@ -97,6 +97,31 @@ class WaypointUpdater(object):
                     #rospy.loginfo("waypoint index: %s", a)
                     #self.final_waypoints.append(self.waypoints[a])
             lane = Lane()
+            lane.header.frame_id = '/world'
+            lane.header.stamp = rospy.Time(0)
+            # Check if Traffic light was detected and plan waypoint accordingly
+            if self.next_red_traffic_light_idx == -1:
+                lane.waypoints = self.waypoints[self.current_pose_idx:self.current_pose_idx+LOOKAHEAD_WPS]
+            else:
+                lane.waypoints = []
+            self.final_waypoints_pub.publish(lane)
+        else:
+            rospy.logerr("Waypoints not loaded")
+
+    def publish_old2(self):
+        position = self.current_pose.position
+        if self.waypoints_loaded:
+            # Find the next LOOKAHEAD_WPS waypoints
+            #rospy.loginfo(position)
+            for a in range(len(self.waypoints)):
+                if self.waypoints[a].pose.pose.position.x > position.x:
+                    self.current_pose_idx = a - 1
+                    rospy.loginfo("current_pose_idx: %s and current_vel = %s", a-1, self.waypoints[a-1].twist.twist.linear.x)
+                    break
+                    #rospy.loginfo("current position idx: %s", self.current_pose_idx)
+                    #rospy.loginfo("waypoint index: %s", a)
+                    #self.final_waypoints.append(self.waypoints[a])
+            lane = Lane()
             
             # Check if Traffic light was detected and plan waypoint accordingly
             if self.next_red_traffic_light_idx != -1 and not self.is_stopped:
@@ -124,7 +149,7 @@ class WaypointUpdater(object):
                     next_waypoint_vel = 1.1 + self.waypoints[idx+self.current_pose_idx].twist.twist.linear.x + (idx + 1)*ACCEL
                     if next_waypoint_vel > MAX_SPEED:
                         next_waypoint_vel = MAX_SPEED
-                    self.set_waypoint_velocity(self.waypoints, idx + self.current_pose_idx, 11)
+                    self.set_waypoint_velocity(self.waypoints, idx + self.current_pose_idx, 11.0)
                     #rospy.loginfo("setting vel for idx= %s to %s", self.current_pose_idx + idx, self.waypoints[self.current_pose_idx+idx].twist.twist.linear.x)
 
             lane.header.frame_id = '/world'
