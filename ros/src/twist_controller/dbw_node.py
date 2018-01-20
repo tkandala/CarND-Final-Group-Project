@@ -38,7 +38,7 @@ TS = 0.1
 GAS_DENSITY = 2.858
 
 #Set it True if simulator and VM are used.
-IsSimulator = True
+IsSimulator = False
 
 class DBWNode(object):
 
